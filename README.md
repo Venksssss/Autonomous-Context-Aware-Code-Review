@@ -80,7 +80,42 @@ uvicorn app.main:app --reload
 
 - **Swagger URL**: http://127.0.0.1:8000/docs
 - **Health endpoint**: http://127.0.0.1:8000/health
-- **Repository inspection endpoint**: http://127.0.0.1:8000/api/repositories/inspect?repository_path=/path/to/repo
+- **Repository inspection endpoint**: `GET /api/repositories/inspect?repository_path=/path/to/repo`
+- **Diff extraction endpoint**: `POST /api/repositories/diff`
+
+### Diff Extraction API
+This endpoint compares two Git revisions and returns a structured representation of the code changes.
+- `base_revision`: The starting Git revision (e.g., `main`, `HEAD~1`, or a commit SHA)
+- `head_revision`: The ending Git revision (e.g., `feature/branch`, `HEAD`, or a commit SHA)
+
+**Example Request**:
+```json
+{
+    "repository_path": "C:\\Projects\\myrepo",
+    "base_revision": "HEAD~1",
+    "head_revision": "HEAD"
+}
+```
+
+**Example Response**:
+```json
+{
+    "repository": "C:\\Projects\\myrepo",
+    "base_revision": "HEAD~1",
+    "head_revision": "HEAD",
+    "files_changed": 1,
+    "files": [
+        {
+            "path": "app/auth.py",
+            "change_type": "modified",
+            "additions": 4,
+            "deletions": 2,
+            "patch": "diff --git a/app/auth.py b/app/auth.py\n..."
+        }
+    ]
+}
+```
+*Supported change types:* `added`, `modified`, `deleted`, `renamed`, `copied`, `unknown`.
 
 ## How to run tests
 From the `backend` directory, run:
@@ -89,8 +124,8 @@ pytest -v
 ```
 
 ## Known Limitations
-- Currently, it only inspects a local filesystem path to determine if it is a Git repository.
-- Does not yet parse commit history, diffs, or code files.
+- Currently, it only inspects a local filesystem path and extracts Git diffs deterministically.
+- Does not decode binary file diffs as text.
 
 ## Future Phases
 - RAG and Vector database integration.
