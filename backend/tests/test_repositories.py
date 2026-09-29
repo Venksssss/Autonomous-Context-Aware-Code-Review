@@ -93,6 +93,9 @@ def diff_git_repo():
     subprocess.run(["git", "rm", "del.txt"], cwd=temp_dir, capture_output=True) # deleted
     subprocess.run(["git", "mv", "old.txt", "new.txt"], cwd=temp_dir, capture_output=True) # renamed
     
+    file_bin = Path(temp_dir) / "image.bin"
+    file_bin.write_bytes(b'\x00\x01\x02\x03\x04\x05\x06')
+    
     subprocess.run(["git", "add", "."], cwd=temp_dir, capture_output=True)
     subprocess.run(["git", "commit", "-m", "Commit B"], cwd=temp_dir, capture_output=True)
     
@@ -146,7 +149,7 @@ def test_diff_multiple_changed_files(diff_git_repo):
         "head_revision": "HEAD"
     })
     data = response.json()
-    assert data["files_changed"] == 4
+    assert data["files_changed"] == 5
 
 def test_diff_no_changes(diff_git_repo):
     response = client.post("/api/repositories/diff", json={
@@ -198,5 +201,18 @@ def test_diff_fastapi_integration(diff_git_repo):
     assert "repository" in data
     assert "base_revision" in data
     assert "head_revision" in data
-    assert data["files_changed"] == 4
+    assert data["files_changed"] == 5
     assert isinstance(data["files"], list)
+
+def test_diff_binary_file(diff_git_repo):
+    response = client.post("/api/repositories/diff", json={
+        "repository_path": diff_git_repo,
+        "base_revision": "HEAD~1",
+        "head_revision": "HEAD"
+    })
+    data = response.json()
+    bin_file = next(f for f in data["files"] if f["path"] == "image.bin")
+    assert bin_file["change_type"] == "added"
+    assert bin_file["patch"] is None
+    assert bin_file["additions"] == 0
+    assert bin_file["deletions"] == 0

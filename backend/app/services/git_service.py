@@ -12,8 +12,16 @@ class GitAppError(Exception):
         super().__init__(self.message)
 
 class GitService:
+    """
+    A service class for interacting with Git repositories via the subprocess CLI.
+    Provides deterministic, read-only extraction of repository states and diffs.
+    """
     @staticmethod
     def inspect_repository(path: str) -> dict:
+        """
+        Inspect a filesystem path to determine if it is a Git repository.
+        Returns basic metadata such as the current branch and HEAD commit.
+        """
         target_path = Path(path)
         
         if not target_path.exists():
@@ -85,6 +93,10 @@ class GitService:
 
     @staticmethod
     def get_diff(path: str, base_revision: str, head_revision: str) -> dict:
+        """
+        Extract the Git diff between two revisions in a repository.
+        Returns the list of changed files, their statuses, line counts, and unified patches.
+        """
         target_path = Path(path)
         
         if not target_path.exists() or not target_path.is_dir():
