@@ -123,11 +123,44 @@ From the `backend` directory, run:
 pytest -v
 ```
 
-## Known Limitations
+## Current limitations
 - Currently, it only inspects a local filesystem path and extracts Git diffs deterministically.
 - Does not decode binary file diffs as text.
 
-## Future Phases
+## Phase 2 — Semantic Repository Understanding
+
+### Segment 1: Tree-sitter Foundation
+Phase 2 Segment 1 introduces deterministic, semantic source code parsing using **Tree-sitter**.
+Unlike text-based diffing or regex searching, AST (Abstract Syntax Tree) parsing natively understands source code structures like functions, classes, and statements. Tree-sitter is incredibly fast, error-tolerant, and allows deterministic parsing.
+
+**Current Supported Language**: Python
+
+**Code Parsing Endpoint**: `POST /api/code/parse`
+This endpoint parses a specified file in the given repository and returns structural metadata.
+
+**Example Request**:
+```json
+{
+    "repository_path": "C:\\Projects\\myrepo",
+    "file_path": "app/auth.py"
+}
+```
+
+**Example Response**:
+```json
+{
+    "path": "app/auth.py",
+    "language": "python",
+    "parsed": true,
+    "has_errors": false,
+    "root_node_type": "module",
+    "error_count": 0
+}
+```
+*Note: We are not yet extracting functions, classes, references, call graphs, or symbol indexes. Those will arrive in later Phase 2 segments.*
+
+## Next Phases
+- Semantic symbol and reference extraction.
 - RAG and Vector database integration.
 - LLM-based autonomous reviews.
 - Testing sandboxes and MCP integration.
