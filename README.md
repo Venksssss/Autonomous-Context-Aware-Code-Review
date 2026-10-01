@@ -301,6 +301,57 @@ Discovers all Python files, analyzes them, and constructs the structural model.
 **Context Query API**: `POST /api/repository/context`
 Retrieves the structurally related context for a specific symbol (e.g. its definition, what it calls, what calls it, and its imports), which is highly valuable for providing a targeted structural view to an LLM without overwhelming it with the entire codebase.
 
+## Phase 3 — Agentic Infrastructure
+
+### Segment 1 — LLM Abstraction
+
+Phase 3 introduces the foundation for LLM-based autonomous behavior, starting with a clean, provider-agnostic abstraction layer.
+
+**LLM Architecture**
+```
+Application / Planner Service
+    ↓
+LLM Factory
+    ↓
+LLM Provider Interface
+    ↓
+Ollama (or FakeLLMProvider for tests)
+```
+
+By relying on this abstraction rather than directly importing `ChatOllama` across the codebase, the application stays highly decoupled. This allows future seamless integrations with other providers (like Gemini or OpenAI) without modifying agent logic.
+
+**Capabilities Implemented**
+- **Local Ollama Support:** Configured via environment variables (`LLM_PROVIDER`, `OLLAMA_BASE_URL`, `OLLAMA_MODEL`, `LLM_TEMPERATURE`, `LLM_TIMEOUT`). No hardcoded secrets.
+- **Structured Pydantic Output:** The AI explicitly responds with strongly-typed outputs (e.g. `ReviewPlan`) rather than unpredictable raw strings.
+- **Testability:** A `FakeLLMProvider` guarantees the entire test suite (now 63 tests) runs identically on any machine without requiring Ollama to be installed, running, or models to be pulled.
+
+**AI Planning API**: `POST /api/ai/review-plan`
+Accepts a natural-language review request and repository context, returning a structured review plan containing `scope`, `priority`, `reason`, and `required_context`.
+
+**Example Request:**
+```json
+{
+  "request": "Review the authentication changes for security and regressions.",
+  "repository_context": {
+    "changed_files": ["app/auth.py"],
+    "changed_symbols": ["AuthService.authenticate"]
+  }
+}
+```
+
+**Example Response:**
+```json
+{
+  "scope": ["security", "logic"],
+  "priority": "high",
+  "reason": "Authentication logic directly impacts access control.",
+  "required_context": [
+    "AuthService.authenticate implementation",
+    "callers of authenticate"
+  ]
+}
+```
+
 ## Next Phases
-- Phase 3: Agentic infrastructure (LLM-based autonomous reviews, sandboxes, and MCP integration).
-- Phase 4: GitHub PR automation and UI.
+- Phase 3, Segment 2: Agents, MCP, memory, and orchestrated review pipelines.
+- Phase 4: GitHub PR automation and user-facing endpoints.
