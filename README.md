@@ -255,10 +255,52 @@ All line numbers are **1-based**. Qualified names use dot-notation (`Outer.Inner
 - Repository-wide indexing
 - Any LLM inference
 
-Those capabilities are Segment 3.
+### Segment 3: Repository-wide Semantic Model
+
+Segment 3 converts the per-file structural analysis from Segment 2 into a deterministic, repository-wide knowledge graph.
+
+**Architecture Pipeline**
+```
+Files
+ ↓
+Tree-sitter
+ ↓
+FileAnalysis
+ ↓
+Symbol Index
+ ↓
+Import Resolution
+ ↓
+Call Resolution
+ ↓
+Relationship Graph
+ ↓
+Context Query
+```
+
+**CALL EXTRACTION vs. CALL RESOLUTION**
+
+It is critical to distinguish between these two:
+- **CALL EXTRACTION (Segment 2)** identifies *syntactic* calls, like "this file contains a call to `verify_token()`".
+- **CALL RESOLUTION (Segment 3)** attempts to map that call to a specific repository symbol, e.g., "`verify_token` defined in `app/auth.py:27`".
+
+Segment 3 uses deterministic import mapping, module resolution, and uniqueness checks to resolve calls. If a reference cannot be deterministically resolved without type inference, it is explicitly flagged as `unresolved`. If multiple valid candidates exist (e.g. `service.process`), it is flagged as `ambiguous`.
+
+**Symbol Identity Strategy**
+Symbols are uniquely identified using: `module_name::qualified_name::file_path`
+(Example: `app.payment::PaymentService.process::app/payment.py`)
+
+**Relationship Types**
+- `defines`: A file defines a symbol.
+- `imports`: A file imports a symbol or module from another file.
+- `calls`: A symbol invokes another resolved symbol.
+
+**Repository Analysis API**: `POST /api/repository/analyze`
+Discovers all Python files, analyzes them, and constructs the structural model.
+
+**Context Query API**: `POST /api/repository/context`
+Retrieves the structurally related context for a specific symbol (e.g. its definition, what it calls, what calls it, and its imports), which is highly valuable for providing a targeted structural view to an LLM without overwhelming it with the entire codebase.
 
 ## Next Phases
-- **Segment 3**: Cross-file symbol resolution and intra-repository call graph construction.
-- RAG and Vector database integration.
-- LLM-based autonomous reviews.
-- Testing sandboxes and MCP integration.
+- Phase 3: Agentic infrastructure (LLM-based autonomous reviews, sandboxes, and MCP integration).
+- Phase 4: GitHub PR automation and UI.
