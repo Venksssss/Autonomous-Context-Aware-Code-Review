@@ -157,10 +157,108 @@ This endpoint parses a specified file in the given repository and returns struct
     "error_count": 0
 }
 ```
-*Note: We are not yet extracting functions, classes, references, call graphs, or symbol indexes. Those will arrive in later Phase 2 segments.*
+*Note: Segment 1 focuses on parse validation only — symbol extraction is Segment 2.*
+
+### Segment 2: AST Symbol and Reference Extraction
+
+Phase 2 Segment 2 walks the Tree-sitter syntax tree produced in Segment 1 and
+deterministically extracts structured code intelligence from individual Python files.
+
+**Architecture**
+
+```
+Tree-sitter parse (Segment 1)
+    |
+    v
+Syntax Tree (in-memory)
+    |
+    v
+CodeAnalyzerService — AST traversal
+    |
+    +-- Symbols (classes / functions / methods, qualified names, source locations)
+    +-- Imports (import X / from X import Y / import X as Y)
+    +-- Calls   (syntactic call sites, not yet resolved cross-file)
+```
+
+**Extracted information per file**
+
+| Kind | Examples |
+|---|---|
+| Class | `PaymentService` |
+| Function | `helper` |
+| Method | `PaymentService.process` |
+| Parameters | `["self", "user"]` |
+| Import | `import os`, `import numpy as np` |
+| From-import | `from app.auth import verify_token` |
+| Call site | `verify_token(user)`, `charge(token)` |
+
+All line numbers are **1-based**. Qualified names use dot-notation (`Outer.Inner.method`).
+
+**Code Analysis Endpoint**: `POST /api/code/analyze`
+
+**Example Request**:
+```json
+{
+    "repository_path": "C:\\Projects\\myrepo",
+    "file_path": "app/payment.py"
+}
+```
+
+**Example Response**:
+```json
+{
+  "file_path": "app/payment.py",
+  "language": "python",
+  "symbols": [
+    {
+      "name": "PaymentService",
+      "qualified_name": "PaymentService",
+      "symbol_type": "class",
+      "file_path": "app/payment.py",
+      "start_line": 3,
+      "end_line": 7,
+      "start_column": 0,
+      "end_column": 28,
+      "parent": null,
+      "parameters": null
+    },
+    {
+      "name": "process",
+      "qualified_name": "PaymentService.process",
+      "symbol_type": "method",
+      "file_path": "app/payment.py",
+      "start_line": 5,
+      "end_line": 7,
+      "start_column": 4,
+      "end_column": 28,
+      "parent": "PaymentService",
+      "parameters": ["self", "user"]
+    }
+  ],
+  "imports": [
+    { "module": "app.auth", "name": "verify_token", "alias": null, "line": 1 }
+  ],
+  "calls": [
+    { "name": "verify_token", "line": 6, "column": 16, "kind": "call" },
+    { "name": "charge",       "line": 7, "column": 15, "kind": "call" }
+  ],
+  "has_errors": false,
+  "error_count": 0
+}
+```
+
+**What Segment 2 does NOT do (by design)**
+
+- Cross-file symbol resolution — `verify_token` is recorded syntactically but not linked to its definition in `app/auth.py`
+- Call graph construction
+- Dependency graph
+- Repository-wide indexing
+- Any LLM inference
+
+Those capabilities are Segment 3.
 
 ## Next Phases
-- Semantic symbol and reference extraction.
+- **Segment 3**: Cross-file symbol resolution and intra-repository call graph construction.
 - RAG and Vector database integration.
 - LLM-based autonomous reviews.
 - Testing sandboxes and MCP integration.
