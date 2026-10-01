@@ -32,7 +32,7 @@ def build_context_summary(state: ReviewWorkflowState) -> Optional[Dict[str, Any]
     if not diff:
         return None
 
-    changed_files = [f.get("file_path") for f in diff.get("changed_files", [])]
+    changed_files = [f.get("path") or f.get("file_path") for f in diff.get("files", diff.get("changed_files", []))]
     summary: Dict[str, Any] = {
         "changed_files": changed_files,
         "total_additions": diff.get("total_additions", 0),
@@ -41,10 +41,10 @@ def build_context_summary(state: ReviewWorkflowState) -> Optional[Dict[str, Any]
     # Include the first meaningful patch text per file (truncated) so the
     # planner has some signal without being swamped by large diffs.
     patches = []
-    for cf in diff.get("changed_files", [])[:5]:          # cap at 5 files
+    for cf in diff.get("files", diff.get("changed_files", []))[:5]:          # cap at 5 files
         patch = cf.get("patch", "")
         if patch:
-            patches.append({"file": cf.get("file_path"), "patch": patch[:800]})
+            patches.append({"file": cf.get("path") or cf.get("file_path"), "patch": patch[:800]})
     if patches:
         summary["patches"] = patches
     return summary

@@ -19,4 +19,48 @@ class FakeLLMProvider(LLMProvider):
                 reason="Authentication behavior changed.",
                 required_context=["changed function", "callers", "authentication implementation"]
             )
+        
+        # Avoid circular imports by importing locally
+        from app.schemas.agent_findings import AgentFindings, Finding
+        if schema == AgentFindings:
+            # Determine which finding to return based on the messages content
+            prompt_text = " ".join([m.content for m in messages if isinstance(m.content, str)])
+            
+            if "security code reviewer" in prompt_text.lower():
+                return schema(findings=[
+                    Finding(
+                        id="sec-001",
+                        category="security",
+                        severity="high",
+                        title="SQL Injection Risk",
+                        description="Potential SQL injection in user query.",
+                        file_path="app/auth.py",
+                        start_line=47,
+                        end_line=47,
+                        evidence=["SELECT * FROM users WHERE id = "],
+                        recommendation="Use parameterized queries.",
+                        confidence=0.9,
+                        source_agent="security"
+                    )
+                ])
+            elif "quality and logic code reviewer" in prompt_text.lower():
+                return schema(findings=[
+                    Finding(
+                        id="qual-001",
+                        category="logic",
+                        severity="medium",
+                        title="Inefficient Loop",
+                        description="Unnecessary multiple database calls in loop.",
+                        file_path="app/auth.py",
+                        start_line=50,
+                        end_line=55,
+                        evidence=["user = db.get(user_id)"],
+                        recommendation="Fetch users in batch.",
+                        confidence=0.9,
+                        source_agent="quality"
+                    )
+                ])
+            else:
+                return schema(findings=[])
+            
         raise ValueError(f"FakeLLMProvider does not support schema {schema.__name__}")

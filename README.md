@@ -416,3 +416,40 @@ Full LangGraph-powered review workflow.
 ## Next Phases
 - Phase 3, Segment 3: Specialist agents (context, security, quality) + synthesizer.
 - Phase 4: GitHub PR automation and user-facing endpoints.
+
+### Segment 3 — Multi-Agent Repository Analysis
+
+Segment 3 transforms the linear planner pipeline into a real multi-agent analysis workflow.
+
+**Graph Topology**
+```
+START → planner → context_agent
+                       │
+            ┌──────────┴──────────┐
+            ▼                     ▼
+      security_agent        quality_agent
+            │                     │
+            └──────────┬──────────┘
+                       ▼
+                      END
+```
+
+**Agents**
+1. **Context Agent**: Deterministically expands the Git diff into structural repository context (related symbols, calls, imports). It uses `RepositoryAnalyzerService` to find callers/callees. It does *not* use an LLM, ensuring facts are deterministic.
+2. **Security Agent**: A specialist LLM prompt focused on finding security vulnerabilities using the supplied repository context.
+3. **Quality Agent**: A specialist LLM prompt focused on finding logic defects, inefficient operations, and maintainability issues.
+
+**Shared State and Findings Reducer**
+The `findings` field in `ReviewWorkflowState` uses LangGraph's `operator.add` reducer. This allows `security_agent` and `quality_agent` to run in parallel (fan-out) and safely append their structured `Finding` objects to the state without overwriting each other.
+
+**Finding Quality Control**
+Before appending a finding to the state, the agents validate:
+- The referenced file actually exists in the target repository.
+- The start and end lines are within the file's valid line range.
+
+**Final Synthesis**
+*Note: The final `synthesizer` node (which merges specialist findings into a cohesive final review report) is not yet implemented.*
+
+## Next Phases
+- Phase 3, Segment 4: Synthesizer agent, final review report, memory, and Docker sandbox.
+- Phase 4: GitHub PR automation and user-facing endpoints.
