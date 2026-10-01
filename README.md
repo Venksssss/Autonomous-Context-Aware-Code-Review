@@ -355,3 +355,64 @@ Accepts a natural-language review request and repository context, returning a st
 ## Next Phases
 - Phase 3, Segment 2: Agents, MCP, memory, and orchestrated review pipelines.
 - Phase 4: GitHub PR automation and user-facing endpoints.
+
+### Segment 2 — LangGraph Orchestration
+
+Segment 2 introduces LangGraph as the workflow engine, replacing ad-hoc sequential calls with a typed, state-driven pipeline.
+
+**Why shared state?**
+In a multi-agent system each specialist (context, security, quality) needs to read findings from earlier agents and contribute its own.  A shared, append-safe TypedDict state lets every node read what it needs and write only what it produces, without lock-step coupling.
+
+**Current graph topology**
+```
+START → planner → END
+```
+
+**State fields (key)**
+| Field | Populated by | Purpose |
+|---|---|---|
+| `review_request` | caller | natural-language request |
+| `diff` | workflow service | raw Git diff data |
+| `review_plan` | planner node | AI-produced plan |
+| `findings` | future specialist agents | accumulated findings |
+| `errors` | any node | error accumulation (add-reducer) |
+
+**Why routes call WorkflowService, not LangGraph directly**
+Routes must stay thin.  `ReviewWorkflowService` owns: diff retrieval (via `GitService`, not HTTP), graph construction with injected provider, and result marshalling.  LangGraph internals never leak into route handlers.
+
+**Orchestrated Review API**: `POST /api/ai/review`
+Full LangGraph-powered review workflow.
+
+**Example Request:**
+```json
+{
+  "review_request": "Review the authentication changes for security and regressions.",
+  "repository_path": "C:\\Projects\\repo",
+  "base_revision": "main",
+  "head_revision": "feature/login"
+}
+```
+
+**Example Response:**
+```json
+{
+  "status": "planned",
+  "review_plan": {
+    "scope": ["security", "logic"],
+    "priority": "high",
+    "reason": "Authentication behavior changed.",
+    "required_context": ["changed function", "callers", "authentication implementation"]
+  },
+  "errors": []
+}
+```
+
+**Future segments will add** (not yet implemented):
+- `context_agent` node — retrieves relevant repository graph context
+- `security_agent` node — specialised security review
+- `quality_agent` node — code quality review
+- `synthesizer` node — merges specialist findings into final report
+
+## Next Phases
+- Phase 3, Segment 3: Specialist agents (context, security, quality) + synthesizer.
+- Phase 4: GitHub PR automation and user-facing endpoints.
