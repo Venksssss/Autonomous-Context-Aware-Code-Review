@@ -716,3 +716,32 @@ To run the sandbox locally:
 5. **Run docker-mode tests**: Send a request to `POST /api/tests/run` with `"execution_mode": "docker"`.
 
 *What happens if Docker is unavailable?* The API will immediately reject requests explicitly requesting `docker` execution mode. Fall back to `execution_mode="local"` if you are running in an environment without Docker support.
+
+## Phase 4 — Segment 3: Runtime Verification Agent
+
+The **Verification Agent** connects static code analysis to deterministic runtime evidence, validating AI-generated findings against actual test behavior. 
+
+### Architecture
+
+1. **Static Finding**: Security and Quality agents produce potential findings.
+2. **Runtime Test Evidence**: The 	est_execution node runs the repository's test suite deterministically (via Docker if enabled).
+3. **Verification Agent**: Identifies if the runtime evidence proves, contradicts, or is inconclusive about the finding.
+4. **Output**: The Verification Agent assigns one of four statuses: erified, contradicted, inconclusive, or 
+ot_tested.
+
+### How Evidence Matches
+
+Evidence matching relies heavily on **deterministic** signals rather than LLM guesswork:
+- Finding file paths mapped to test file paths.
+- Test names mentioned in the finding description.
+- Exception types matching those found in the pytest output.
+
+If relevant failure traces are discovered, the Verification Agent uses an LLM to interpret the semantics and make a final determination.
+
+### Why Pass/Fail semantics matter
+- **Tests passed** does **NOT** mean all findings are false (e.g., performance issues and security vulnerabilities often exist without test failures). Such results are marked inconclusive.
+- **Test failed** does **NOT** automatically mean the finding is proven. The failure must directly support the claim (e.g. 	est_authentication fails exactly due to the KeyError mentioned in the finding) to be marked erified.
+
+### LangGraph Workflow Topology
+START -> planner -> context_agent -> (security_agent + quality_agent) -> test_execution -> verification_agent -> synthesizer -> END
+

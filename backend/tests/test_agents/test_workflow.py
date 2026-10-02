@@ -22,6 +22,10 @@ class AuthService:
         with open(os.path.join(d, "app", "auth.py"), "w", encoding="utf-8") as f:
             f.write(auth_code)
             
+        os.makedirs(os.path.join(d, "tests"), exist_ok=True)
+        with open(os.path.join(d, "tests", "test_auth.py"), "w", encoding="utf-8") as f:
+            f.write("def test_auth_fails():\n    assert False\n")
+            
         subprocess.run(["git", "add", "."], cwd=d, check=True)
         subprocess.run(["git", "commit", "-m", "init"], cwd=d, check=True)
         
@@ -70,3 +74,11 @@ def test_full_workflow_parallel_findings(temp_repo):
     # Check context was generated
     assert result.get("context") is not None
     assert "app/auth.py" in result["context"]["changed_files"]
+    
+    # Check test execution ran
+    assert result.get("runtime_test_result") is not None
+    assert result["runtime_test_result"]["status"] == "failed"
+    
+    # Check verification ran
+    assert "verification_results" in result
+    assert len(result["verification_results"]) == 2

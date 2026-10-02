@@ -22,6 +22,7 @@ class TestExecutionRequest(BaseModel):
     execution_mode: Literal["local", "docker"] = "local"
 
 class TestExecutionResult(BaseModel):
+    __test__ = False
     framework: TestFramework
     execution_mode: Literal["local", "docker"] = "local"
     sandboxed: bool = False

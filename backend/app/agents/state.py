@@ -36,6 +36,12 @@ class ReviewWorkflowState(TypedDict, total=False):
     # Final consolidated report produced by the Synthesizer Agent.
     # None until the synthesizer node runs successfully.
     final_review: Optional[Dict[str, Any]]
+    
+    # Runtime test result from execution
+    runtime_test_result: Optional[Dict[str, Any]]
+    
+    # Verification results matching findings against runtime evidence
+    verification_results: Annotated[List[Dict[str, Any]], operator.add]
 
     # Errors accumulated across nodes; using add-reducer so multiple
     # nodes can each append without clobbering each other's entries.
