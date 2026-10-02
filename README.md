@@ -745,3 +745,79 @@ If relevant failure traces are discovered, the Verification Agent uses an LLM to
 ### LangGraph Workflow Topology
 START -> planner -> context_agent -> (security_agent + quality_agent) -> test_execution -> verification_agent -> synthesizer -> END
 
+
+ # #   P h a s e   4      S e g m e n t   4 :   R u n t i m e - A w a r e   F i n a l   S y n t h e s i s 
+ 
+ T h e   * * S y n t h e s i z e r   A g e n t * *   a g g r e g a t e s   s t a t i c   f i n d i n g s   f r o m   t h e   s p e c i a l i s t   a g e n t s   a l o n g   w i t h   r u n t i m e   e v i d e n c e   t o   p r o d u c e   t h e   * * R u n t i m e - A w a r e   F i n a l   R e v i e w * * . 
+ 
+ # # #   A r c h i t e c t u r e 
+ S t a t i c   F i n d i n g s   
+               +   
+ R u n t i m e   T e s t   R e s u l t s   
+               +   
+ V e r i f i c a t i o n   R e s u l t s   
+               “!
+ F i n a l   S y n t h e s i z e r   
+               “!
+ R u n t i m e - A w a r e   F i n a l   R e v i e w 
+ 
+ # # #   V e r i f i c a t i o n   S t a t u s   T y p e s 
+ -   * * v e r i f i e d * * :   T h e   t e s t   f a i l u r e   e x a c t l y   m a t c h e s   a n d   p r o v e s   t h e   f i n d i n g . 
+ -   * * c o n t r a d i c t e d * * :   T h e   c o d e   r a n   s u c c e s s f u l l y ,   d i r e c t l y   d i s p r o v i n g   a   c l a i m e d   c r a s h / e r r o r . 
+ -   * * i n c o n c l u s i v e * * :   T e s t s   p a s s e d ,   b u t   c o u l d   n o t   d e f i n i t e l y   d i s p r o v e   t h e   f i n d i n g   ( e . g .   s e c u r i t y   v u l n e r a b i l i t i e s   w i t h o u t   e x p l i c i t   r e g r e s s i o n   t e s t s ) . 
+ -   * * n o t _ t e s t e d * * :   N o   r e l e v a n t   t e s t s   w e r e   f o u n d   f o r   t h i s   i s s u e . 
+ 
+ # # #   A P I   R e s p o n s e   F o r m a t 
+ 
+ \ \ \ j s o n 
+ { 
+     \  
+ s t a t u s \ :   \ c o m p l e t e d \ , 
+     \ r e v i e w _ p l a n \ :   { . . . } , 
+     \ f i n d i n g s \ :   [ . . . ] , 
+     \ r u n t i m e _ t e s t _ r e s u l t \ :   { 
+         \ s t a t u s \ :   \ f a i l e d \ , 
+         \ t e s t s _ r u n \ :   1 0 , 
+         \ t e s t s _ p a s s e d \ :   9 , 
+         \ t e s t s _ f a i l e d \ :   1 , 
+         \ e x e c u t i o n _ m o d e \ :   \ d o c k e r \ 
+     } , 
+     \ v e r i f i c a t i o n _ r e s u l t s \ :   [ 
+         { 
+             \ f i n d i n g _ i d \ :   \ s e c - 0 0 1 \ , 
+             \ v e r i f i c a t i o n _ s t a t u s \ :   \ v e r i f i e d \ , 
+             \ s u p p o r t i n g _ t e s t s \ :   [ \ t e s t s / t e s t _ a u t h . p y : : t e s t _ l o g i n \ ] , 
+             \ e x p l a n a t i o n \ :   \ T e s t  
+ f a i l e d  
+ w i t h  
+ t h e  
+ e x a c t  
+ e x c e p t i o n  
+ r e p o r t e d . \ 
+         } 
+     ] , 
+     \ f i n a l _ r e v i e w \ :   { 
+         \ s u m m a r y \ :   \ 1  
+ c r i t i c a l  
+ i s s u e  
+ v e r i f i e d  
+ b y  
+ t e s t s . \ , 
+         \ o v e r a l l _ r i s k \ :   \ c r i t i c a l \ , 
+         \ f i n d i n g s \ :   [ . . . ] , 
+         \ r u n t i m e _ s u m m a r y \ :   { 
+             \ s t a t u s \ :   \ f a i l e d \ , 
+             \ t e s t s _ r u n \ :   1 0 
+         } , 
+         \ v e r i f i c a t i o n _ s u m m a r y \ :   { 
+             \ v e r i f i e d \ :   1 , 
+             \ c o n t r a d i c t e d \ :   0 , 
+             \ i n c o n c l u s i v e \ :   0 , 
+             \ n o t _ t e s t e d \ :   0 
+         } 
+     } , 
+     \ e r r o r s \ :   [ ] 
+ } 
+ \ \ \ 
+  
+ 

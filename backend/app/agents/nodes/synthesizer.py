@@ -40,6 +40,8 @@ def synthesizer_node(
     review_plan: Optional[Dict[str, Any]] = state.get("review_plan")
     context: Optional[Dict[str, Any]] = state.get("context")
     review_request: str = state.get("review_request", "")
+    runtime_test_result = state.get("runtime_test_result")
+    verification_results = state.get("verification_results") or []
 
     # Build a bounded diff summary (no raw patch text)
     diff_summary = build_context_summary(state)
@@ -52,6 +54,8 @@ def synthesizer_node(
             diff_summary=diff_summary,
             context=context,
             raw_findings=raw_findings,
+            runtime_test_result=runtime_test_result,
+            verification_results=verification_results,
         )
         logger.info(
             "synthesizer: completed, overall_risk=%s findings=%d",

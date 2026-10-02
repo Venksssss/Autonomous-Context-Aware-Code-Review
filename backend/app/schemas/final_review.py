@@ -14,6 +14,7 @@ from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel
 
 from app.schemas.agent_findings import Finding
+from app.schemas.verification import VerificationResult
 
 OverallRisk = Literal["critical", "high", "medium", "low", "none"]
 
@@ -23,6 +24,24 @@ class AnalysisMetadata(BaseModel):
     security_findings: int = 0
     quality_findings: int = 0
     agents_used: List[str] = []
+
+
+class RuntimeSummary(BaseModel):
+    status: str
+    tests_run: int
+    tests_passed: int
+    tests_failed: int
+    tests_errors: int
+    execution_mode: str
+    sandboxed: bool
+    duration_seconds: float
+
+
+class VerificationSummary(BaseModel):
+    verified: int = 0
+    contradicted: int = 0
+    inconclusive: int = 0
+    not_tested: int = 0
 
 
 class FinalReviewReport(BaseModel):
@@ -39,3 +58,6 @@ class FinalReviewReport(BaseModel):
     recommendations: List[str] = []
     files_reviewed: List[str] = []
     analysis_metadata: AnalysisMetadata = AnalysisMetadata()
+    runtime_summary: Optional[RuntimeSummary] = None
+    verification_summary: VerificationSummary = VerificationSummary()
+    verification_results: List[VerificationResult] = []

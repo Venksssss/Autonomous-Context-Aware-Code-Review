@@ -109,6 +109,29 @@ class ReviewWorkflowService:
             except Exception as exc:
                 errors.append(f"FinalReviewReport schema validation failed: {exc}")
 
+        raw_runtime = final_state.get("runtime_test_result")
+        raw_verification = final_state.get("verification_results") or []
+
+        from app.schemas.test_run import TestExecutionResult
+        from app.schemas.verification import VerificationResult
+
+        runtime_test_result = None
+        if raw_runtime:
+            try:
+                runtime_test_result = TestExecutionResult(**raw_runtime)
+            except Exception as exc:
+                errors.append(f"TestExecutionResult schema validation failed: {exc}")
+
+        verification_results = []
+        for raw_v in raw_verification:
+            try:
+                if isinstance(raw_v, dict):
+                    verification_results.append(VerificationResult(**raw_v))
+                else:
+                    verification_results.append(raw_v)
+            except Exception as exc:
+                errors.append(f"VerificationResult schema validation failed: {exc}")
+
         if errors:
             status = "completed_with_errors" if plan else "failed"
         else:
@@ -123,6 +146,8 @@ class ReviewWorkflowService:
             status=status,
             review_plan=plan,
             findings=findings,
+            runtime_test_result=runtime_test_result,
+            verification_results=verification_results,
             final_review=final_review,
             errors=errors,
         )

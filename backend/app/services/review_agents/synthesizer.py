@@ -15,7 +15,11 @@ import logging
 from typing import Any, Dict, List, Optional
 
 from app.schemas.agent_findings import Finding
-from app.schemas.final_review import AnalysisMetadata, FinalReviewReport, OverallRisk
+from app.schemas.final_review import (
+    AnalysisMetadata, FinalReviewReport, OverallRisk,
+    RuntimeSummary, VerificationSummary
+)
+from app.schemas.verification import VerificationResult
 from app.prompts.synthesizer import build_synthesizer_messages
 from app.services.llm.interface import LLMProvider
 from app.services.llm.factory import create_llm_provider
@@ -111,6 +115,34 @@ def build_analysis_metadata(
         agents_used=agents_used or ["planner", "context", "security", "quality", "synthesizer"],
     )
 
+def build_runtime_summary(runtime_test_result: Optional[Dict[str, Any]]) -> Optional[RuntimeSummary]:
+    if not runtime_test_result:
+        return None
+    return RuntimeSummary(
+        status=runtime_test_result.get("status", "unknown"),
+        tests_run=runtime_test_result.get("tests_run") or 0,
+        tests_passed=runtime_test_result.get("tests_passed") or 0,
+        tests_failed=runtime_test_result.get("tests_failed") or 0,
+        tests_errors=runtime_test_result.get("tests_errors") or 0,
+        execution_mode=runtime_test_result.get("execution_mode", "local"),
+        sandboxed=runtime_test_result.get("sandboxed", False),
+        duration_seconds=runtime_test_result.get("duration_seconds", 0.0),
+    )
+
+def build_verification_summary(verification_results: List[Dict[str, Any]]) -> VerificationSummary:
+    summary = VerificationSummary()
+    for v in verification_results:
+        status = v.get("verification_status")
+        if status == "verified":
+            summary.verified += 1
+        elif status == "contradicted":
+            summary.contradicted += 1
+        elif status == "inconclusive":
+            summary.inconclusive += 1
+        elif status == "not_tested":
+            summary.not_tested += 1
+    return summary
+
 
 # ---------------------------------------------------------------------------
 # Intermediate schema the LLM fills in (subset of FinalReviewReport)
@@ -141,6 +173,8 @@ class SynthesizerService:
         diff_summary: Optional[Dict[str, Any]],
         context: Optional[Dict[str, Any]],
         raw_findings: List[Dict[str, Any]],
+        runtime_test_result: Optional[Dict[str, Any]] = None,
+        verification_results: Optional[List[Dict[str, Any]]] = None,
     ) -> FinalReviewReport:
         """
         Synthesize a FinalReviewReport from specialist findings.
@@ -169,6 +203,17 @@ class SynthesizerService:
         files_reviewed = extract_files_reviewed(diff_summary, context, findings)
         overall_risk = compute_overall_risk(findings)
         metadata = build_analysis_metadata(findings)
+        
+        verification_results_dicts = verification_results or []
+        runtime_summary = build_runtime_summary(runtime_test_result)
+        verification_summary = build_verification_summary(verification_results_dicts)
+        
+        verif_objects = []
+        for v in verification_results_dicts:
+            try:
+                verif_objects.append(VerificationResult(**v))
+            except Exception:
+                pass
 
         # 3. Handle no-findings case without LLM call
         if not findings:
@@ -180,6 +225,9 @@ class SynthesizerService:
                 recommendations=[],
                 files_reviewed=files_reviewed,
                 analysis_metadata=metadata,
+                runtime_summary=runtime_summary,
+                verification_summary=verification_summary,
+                verification_results=verif_objects,
             )
 
         # 4. Build messages and invoke LLM for deduplication + prose
@@ -190,6 +238,9 @@ class SynthesizerService:
             context=context,
             findings=[f.model_dump() for f in findings],
             files_reviewed=files_reviewed,
+            runtime_summary=runtime_summary.model_dump() if runtime_summary else None,
+            verification_summary=verification_summary.model_dump(),
+            verification_results=verification_results_dicts,
         )
 
         llm_output: _SynthesizerLLMOutput = self.provider.structured_invoke(
@@ -213,6 +264,9 @@ class SynthesizerService:
             recommendations=llm_output.recommendations,
             files_reviewed=files_reviewed,
             analysis_metadata=final_metadata,
+            runtime_summary=runtime_summary,
+            verification_summary=verification_summary,
+            verification_results=verif_objects,
         )
 
         logger.info(

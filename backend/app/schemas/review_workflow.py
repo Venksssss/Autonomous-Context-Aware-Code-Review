@@ -16,6 +16,8 @@ class ReviewWorkflowRequest(BaseModel):
     base_revision: Optional[str] = None
     head_revision: Optional[str] = None
 
+from app.schemas.test_run import TestExecutionResult
+from app.schemas.verification import VerificationResult
 
 class ReviewWorkflowResult(BaseModel):
     """
@@ -31,5 +33,7 @@ class ReviewWorkflowResult(BaseModel):
     status: Literal["planned", "completed", "completed_with_errors", "failed"]
     review_plan: Optional[ReviewPlan] = None
     findings: List[Finding] = []
+    runtime_test_result: Optional[TestExecutionResult] = None
+    verification_results: List[VerificationResult] = []
     final_review: Optional[FinalReviewReport] = None
     errors: List[str] = []

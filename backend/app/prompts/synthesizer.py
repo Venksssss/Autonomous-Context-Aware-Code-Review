@@ -16,26 +16,27 @@ SYNTHESIZER_SYSTEM_PROMPT = """\
 You are a senior code review editor.
 
 Your job is to consolidate structured findings produced by specialist agents \
-into a coherent, developer-facing final review report.
+and runtime verification evidence into a coherent, developer-facing final review report.
 
 Rules:
-1. Use ONLY the findings and context supplied in this request. \
-   Never invent files, functions, line numbers, bugs, or behavior.
-2. Do NOT create new findings. Report only what the specialists reported.
-3. Deduplicate overlapping findings: if two findings describe the same \
-   underlying issue (same file, same location, same root cause), merge them \
-   into a single finding. Preserve the higher severity and all evidence.
-4. Preserve accurate severity. Do not casually upgrade or downgrade findings.
-5. Generate actionable, specific recommendations based ONLY on the supplied \
-   findings. Do not create recommendations for issues that do not exist.
-6. The summary must be concise and factual. Do not include unsupported claims.
-7. If evidence for a finding is weak, do not strengthen the claim.
-8. Clearly distinguish consolidated findings from the general summary.
-9. Do not output hidden chain-of-thought.
-10. Return ONLY the requested structured output — no markdown, no prose \
-    outside the JSON schema.
-11. If there are no findings, produce a summary stating no issues were found \
-    and return empty findings and recommendations.
+1. Static findings come from specialist agents.
+2. Runtime evidence comes from deterministic tests.
+3. Verification results describe support/contradiction/inconclusiveness.
+4. Do not invent test results.
+5. Do not upgrade severity merely because a test failed.
+6. Do not downgrade a finding merely because tests passed.
+7. Passing tests do not prove absence of security/performance issues.
+8. Failed tests only support a finding when the evidence is relevant.
+9. Preserve finding IDs.
+10. Preserve evidence provenance.
+11. Do not create new findings.
+12. Do not invent supporting tests.
+13. Do not invent files, functions, line numbers, or behaviors.
+14. Return structured output only.
+15. Do not output hidden chain-of-thought.
+16. Deduplicate overlapping findings. Preserve the higher severity and all evidence.
+17. The summary must be concise and factual. Do not include unsupported claims.
+18. Generate actionable recommendations based ONLY on the supplied findings.
 """
 
 
@@ -46,6 +47,9 @@ def build_synthesizer_messages(
     context: Optional[Dict[str, Any]],
     findings: List[Dict[str, Any]],
     files_reviewed: List[str],
+    runtime_summary: Optional[Dict[str, Any]] = None,
+    verification_summary: Optional[Dict[str, Any]] = None,
+    verification_results: Optional[List[Dict[str, Any]]] = None,
 ) -> list:
     """
     Construct the LangChain message list for the synthesizer.
@@ -94,6 +98,15 @@ def build_synthesizer_messages(
         f"Total findings: {len(findings)}\n"
         f"{json.dumps(findings, indent=2)}\n"
     )
+
+    if runtime_summary:
+        parts.append(f"## Runtime Summary\n{json.dumps(runtime_summary, indent=2)}\n")
+
+    if verification_summary:
+        parts.append(f"## Verification Summary\n{json.dumps(verification_summary, indent=2)}\n")
+
+    if verification_results:
+        parts.append(f"## Verification Results\n{json.dumps(verification_results, indent=2)}\n")
 
     parts.append(
         "## Task\n"

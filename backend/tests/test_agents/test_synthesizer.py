@@ -418,6 +418,47 @@ class TestSynthesizerService:
 # Unit: synthesizer_node
 # ---------------------------------------------------------------------------
 
+    def test_runtime_aware_synthesis(self):
+        svc = SynthesizerService(provider=FakeLLMProvider())
+        finding = make_finding(id_="sec-001", severity="high", file_path="app/auth.py")
+        runtime_result = {
+            "framework": "pytest",
+            "execution_mode": "docker",
+            "sandboxed": True,
+            "status": "failed",
+            "exit_code": 1,
+            "duration_seconds": 2.5,
+            "stdout": "...",
+            "stderr": "",
+            "tests_run": 5,
+            "tests_passed": 4,
+            "tests_failed": 1,
+            "tests_skipped": 0,
+            "tests_errors": 0,
+            "output_truncated": False
+        }
+        verification_results = [{
+            "finding_id": "sec-001",
+            "verification_status": "verified",
+            "supporting_tests": ["tests/test_auth.py::test_login"],
+            "explanation": "Test fails as expected."
+        }]
+        report = svc.synthesize(
+            review_request="Check for issues.",
+            review_plan=None,
+            diff_summary=None,
+            context=None,
+            raw_findings=[finding.model_dump()],
+            runtime_test_result=runtime_result,
+            verification_results=verification_results,
+        )
+        assert report.runtime_summary is not None
+        assert report.runtime_summary.tests_run == 5
+        assert report.runtime_summary.status == "failed"
+        assert report.verification_summary.verified == 1
+        assert len(report.verification_results) == 1
+        assert report.verification_results[0].verification_status == "verified"
+
 class TestSynthesizerNode:
     def test_node_success(self):
         state: ReviewWorkflowState = {
@@ -636,6 +677,9 @@ class TestAPIWithSynthesizer:
         })
         assert resp.status_code == 200
         data = resp.json()
+        assert "runtime_test_result" in data
+        assert "verification_results" in data
+        
         assert "final_review" in data
         assert data["final_review"] is not None
         fr = data["final_review"]
@@ -645,6 +689,9 @@ class TestAPIWithSynthesizer:
         assert "recommendations" in fr
         assert "files_reviewed" in fr
         assert "analysis_metadata" in fr
+        assert "runtime_summary" in fr
+        assert "verification_summary" in fr
+        assert "verification_results" in fr
 
     def test_api_response_preserves_raw_findings(self, monkeypatch):
         from app.services.review_workflow import ReviewWorkflowService as RWS
