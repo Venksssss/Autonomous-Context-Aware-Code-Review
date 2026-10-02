@@ -90,20 +90,13 @@ class TestDockerSandboxExecutor:
         with pytest.raises(DockerSandboxError, match="DOCKER_IMAGE_NOT_AVAILABLE"):
             executor.execute_tests(req)
 
-# Check if docker is available and image has pytest
+# Check if docker is available
 docker_available = DockerRuntime.check_availability()
-pytest_available = False
-if docker_available:
-    try:
-        res = subprocess.run(["docker", "run", "--rm", "python:3.12-slim", "python", "-m", "pytest", "--version"], capture_output=True, timeout=5)
-        pytest_available = res.returncode == 0
-    except Exception:
-        pass
 
-# Integration tests - these skip if Docker is not available or image lacks pytest
+# Integration tests - these skip if Docker is not available
 skip_docker = pytest.mark.skipif(
-    not docker_available or not pytest_available, 
-    reason="Docker is not available or configured image lacks pytest"
+    not docker_available, 
+    reason="Docker is not available on this host"
 )
 
 @skip_docker
@@ -122,7 +115,7 @@ class TestDockerSandboxIntegration:
             res = executor.execute_tests(req)
         except DockerSandboxError as e:
             if "DOCKER_IMAGE_NOT_AVAILABLE" in str(e):
-                pytest.skip("Docker image python:3.12-slim not pulled locally.")
+                pytest.fail("Trusted sandbox image not available. Build it with: docker build -t agentic-code-review-sandbox:latest -f docker/sandbox/Dockerfile .")
             raise
             
         assert res.status == "passed"
@@ -143,7 +136,7 @@ class TestDockerSandboxIntegration:
             res = executor.execute_tests(req)
         except DockerSandboxError as e:
             if "DOCKER_IMAGE_NOT_AVAILABLE" in str(e):
-                pytest.skip("Docker image python:3.12-slim not pulled locally.")
+                pytest.fail("Trusted sandbox image not available. Build it with: docker build -t agentic-code-review-sandbox:latest -f docker/sandbox/Dockerfile .")
             raise
             
         assert res.status == "failed"
@@ -173,7 +166,7 @@ def test_write_fails():
             res = executor.execute_tests(req)
         except DockerSandboxError as e:
             if "DOCKER_IMAGE_NOT_AVAILABLE" in str(e):
-                pytest.skip("Docker image not available.")
+                pytest.fail("Trusted sandbox image not available. Build it with: docker build -t agentic-code-review-sandbox:latest -f docker/sandbox/Dockerfile .")
             raise
             
         assert res.status == "passed"
@@ -200,7 +193,27 @@ def test_network_fails():
             res = executor.execute_tests(req)
         except DockerSandboxError as e:
             if "DOCKER_IMAGE_NOT_AVAILABLE" in str(e):
-                pytest.skip("Docker image not available.")
+                pytest.fail("Trusted sandbox image not available. Build it with: docker build -t agentic-code-review-sandbox:latest -f docker/sandbox/Dockerfile .")
             raise
             
         assert res.status == "passed"
+
+    def test_integration_timeout(self, temp_repo):
+        # Create a test that sleeps
+        test_path = os.path.join(temp_repo, "test_sleep.py")
+        with open(test_path, "w") as f:
+            f.write("import time\ndef test_sleep():\n    time.sleep(10)\n    assert True\n")
+            
+        executor = DockerSandboxExecutor()
+        executor.timeout = 2  # Set very short timeout
+        
+        req = TestExecutionRequest(repository_path=temp_repo, execution_mode="docker")
+        try:
+            res = executor.execute_tests(req)
+        except DockerSandboxError as e:
+            if "DOCKER_IMAGE_NOT_AVAILABLE" in str(e):
+                pytest.fail("Trusted sandbox image not available.")
+            raise
+            
+        assert res.status == "timeout"
+        assert "terminated after" in res.stdout

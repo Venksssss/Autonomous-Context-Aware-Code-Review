@@ -685,20 +685,34 @@ Docker sandboxing provides a strong layer of defense-in-depth against malicious 
 - **Read-Only Filesystem**: `--read-only` enforces a read-only root filesystem. The repository source itself is mounted read-only (`:ro`). Writable space is strictly confined to an ephemeral memory `tmpfs`.
 - **Capabilities Dropped**: `--cap-drop ALL` removes default container privileges.
 - **No New Privileges**: `--security-opt no-new-privileges=true` prevents internal privilege escalation.
+- **Non-Root Execution**: Container explicitly executes with `-u 1000:1000`.
 - **Resource Limits**: CPU (`--cpus`), memory (`--memory`), and process limits (`--pids-limit`) are enforced to avoid resource exhaustion and fork bombs.
 - **Timeout**: The host enforcing a strict timeout kills the container if execution exceeds limits.
 - **Ephemeral Cleanup**: `--rm` is used to automatically destroy containers and artifacts post-execution.
 
 *Note: Docker provides defense-in-depth, but should not be treated as an absolute security boundary against advanced hypervisor escapes. The Docker sandbox must be configured securely on a trusted system.*
 
+### Image Trust and Dependency Strategy
+
+The system relies solely on **Trusted Images** supplied by application configuration (`DOCKER_IMAGE`).
+
+- **No Target Dockerfiles**: The system **will not** build or execute Dockerfiles found inside the untrusted target repository. Doing so could lead to arbitrary command execution during image build.
+- **No Dynamic Dependencies**: The system **will not** run `pip install -r requirements.txt` inside the container for the target repository. This prevents malicious packages from executing installation hooks (`setup.py`) inside the sandbox.
+- **Preconfigured Environment**: The trusted image must come pre-installed with `pytest` and any dependencies the application officially supports testing. Tests for repositories with unfulfilled dependencies will simply fail execution.
+
 ### Docker Setup Documentation
 
 To run the sandbox locally:
 1. **Install Docker**: Install Docker Desktop (Windows/Mac) or Docker Engine (Linux).
-2. **Verify Installation**: Ensure `docker info` and `docker version` succeed.
-3. **Configure Image**: Set the `DOCKER_IMAGE` environment variable (defaults to `python:3.12-slim`).
-4. **Pull the Image**: The API **will not** download images silently. You must pull the trusted image manually beforehand:
+2. **Create the Trusted Sandbox Image**: Do not use the base python image directly, as it lacks `pytest`. Build the official application sandbox image:
    ```sh
-   docker pull python:3.12-slim
+   docker build -t agentic-code-review-sandbox:latest -f docker/sandbox/Dockerfile .
    ```
-   *Note: Make sure your target image has pytest installed if running pytest natively.*
+3. **Verify the Image**: Ensure the image built correctly and `pytest` exists inside it:
+   ```sh
+   docker run --rm agentic-code-review-sandbox:latest python -m pytest --version
+   ```
+4. **Configure Image**: The `DOCKER_IMAGE` environment variable defaults to `agentic-code-review-sandbox:latest`. Set it in your `.env` if you use a different trusted image name.
+5. **Run docker-mode tests**: Send a request to `POST /api/tests/run` with `"execution_mode": "docker"`.
+
+*What happens if Docker is unavailable?* The API will immediately reject requests explicitly requesting `docker` execution mode. Fall back to `execution_mode="local"` if you are running in an environment without Docker support.

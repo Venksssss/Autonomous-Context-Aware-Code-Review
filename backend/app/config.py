@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     # Docker Sandbox Settings
     docker_sandbox_enabled: bool = False
-    docker_image: str = "python:3.12-slim"
+    docker_image: str = "agentic-code-review-sandbox:latest"
     docker_cpu_limit: float = 1.0
     docker_memory_limit: str = "512m"
     docker_pids_limit: int = 128
