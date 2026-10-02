@@ -576,5 +576,91 @@ Both raw `findings` (from specialists) and `final_review` (synthesized) are retu
   - `failed` — no review plan could be produced
 
 ## Next Phases
-- Phase 4: GitHub PR automation and user-facing endpoints.
+- Phase 4, Segment 2: Docker isolation and sandboxing for test execution.
+- Phase 4, Segment 3: Verification agent to analyze test results.
 
+## Phase 4 — Segment 1: Test Discovery and Deterministic Runtime Verification
+
+Segment 1 introduces deterministic test discovery and execution directly on the local environment, serving as the foundation for runtime verification of code reviews. 
+
+*Note: Docker isolation and sandboxing will be introduced in Phase 4 Segment 2.*
+
+### Architectural Principle
+
+Tests are runtime evidence. The LLM must **NOT** decide whether a test passed. The operating system/test runner determines exit codes, pass/fail status, and output. The system converts these results into structured data.
+
+```
+Repository
+    ↓
+Test Discovery
+    ↓
+Test Executor
+    ↓
+TestExecutionResult
+```
+
+### Features
+
+- **Supported Framework**: `pytest`. The system is designed to be extensible to other frameworks in the future.
+- **Discovery Strategy**: Automatically detects test files (`test_*.py`, `*_test.py`) and directories (`tests/`) without recursively scanning ignored directories like `.git`, `.venv`, or `node_modules`.
+- **Execution Strategy**: Executes the full test suite or a targeted test path via a secure subprocess (`sys.executable -m pytest`). The working directory is strictly set to the repository root to ensure correct paths, imports, and config resolution.
+- **Timeout Behavior**: Configurable execution timeout. If exceeded, the process is terminated and partial output is captured.
+- **Output Limits**: Configurable character limits for `stdout` and `stderr` to prevent memory exhaustion, with clear truncation indicators.
+- **Security & Validation**: Strict path validation prevents path traversal outside the repository boundary. Test paths are explicitly validated before execution.
+- **Error Handling**: Uses structured errors (e.g., `TEST_TARGET_INVALID`, `TEST_EXECUTION_FAILED`) rather than raw stack traces.
+
+### API Endpoints
+
+#### POST `/api/tests/discover`
+Discovers available tests in a target repository.
+
+**Request:**
+```json
+{
+  "repository_path": "C:\\Projects\\repo"
+}
+```
+
+**Response:**
+```json
+{
+  "framework": "pytest",
+  "test_count": 1,
+  "tests": [
+    {
+      "path": "tests/test_example.py",
+      "framework": "pytest",
+      "kind": "test_file"
+    }
+  ]
+}
+```
+
+#### POST `/api/tests/run`
+Executes tests in a target repository and parses the results deterministically.
+
+**Request:**
+```json
+{
+  "repository_path": "C:\\Projects\\repo",
+  "test_path": null
+}
+```
+
+**Response:**
+```json
+{
+  "framework": "pytest",
+  "status": "failed",
+  "exit_code": 1,
+  "duration_seconds": 1.82,
+  "stdout": "============================= test session starts ...",
+  "stderr": "",
+  "tests_run": 2,
+  "tests_passed": 1,
+  "tests_failed": 1,
+  "tests_skipped": 0,
+  "tests_errors": 0,
+  "output_truncated": false
+}
+```
