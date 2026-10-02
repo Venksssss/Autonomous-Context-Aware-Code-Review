@@ -1,7 +1,7 @@
 from typing import List, Literal, Optional, Dict, Any
 from pydantic import BaseModel
 from app.schemas.review_planner import ReviewPlan
-
+from app.schemas.agent_findings import Finding
 
 class ReviewWorkflowRequest(BaseModel):
     """
@@ -23,6 +23,8 @@ class ReviewWorkflowResult(BaseModel):
       ReviewPlan    = the planner's AI output (scope, priority, reason, …)
       ReviewWorkflowResult = envelope describing the overall workflow run
     """
-    status: Literal["planned", "failed"]
+    status: Literal["planned", "completed", "completed_with_errors", "failed"]
     review_plan: Optional[ReviewPlan] = None
+    findings: List[Finding] = []
     errors: List[str] = []
+

@@ -161,3 +161,26 @@ def test_api_invalid_repo():
     resp = client.post("/api/repository/analyze", json={"repository_path": "/invalid/path"})
     assert resp.status_code == 400
     assert resp.json()["error"]["code"] == "INVALID_REPOSITORY"
+
+def test_get_symbol_context_limits(repo_fixture):
+    # Temporarily override limits to a small number
+    import app.services.repository_analyzer
+    original_calls = app.services.repository_analyzer.RepositoryAnalyzerService.MAX_CALLS
+    original_called_by = app.services.repository_analyzer.RepositoryAnalyzerService.MAX_CALLED_BY
+    app.services.repository_analyzer.RepositoryAnalyzerService.MAX_CALLS = 2
+    app.services.repository_analyzer.RepositoryAnalyzerService.MAX_CALLED_BY = 2
+    
+    try:
+        # Create a file that calls a symbol 5 times
+        limit_dir = Path(repo_fixture) / "limit_test"
+        limit_dir.mkdir(exist_ok=True)
+        (limit_dir / "target.py").write_text("def target_func(): pass\n", encoding="utf-8")
+        (limit_dir / "caller1.py").write_text("from limit_test.target import target_func\ndef c1(): target_func()\ndef c2(): target_func()\ndef c3(): target_func()\n", encoding="utf-8")
+        
+        ctx = RepositoryAnalyzerService.get_symbol_context(str(repo_fixture), "target_func")
+        
+        # Verify it's limited to MAX_CALLS
+        assert len(ctx.called_by) <= 2  # The limit is 2
+    finally:
+        app.services.repository_analyzer.RepositoryAnalyzerService.MAX_CALLS = original_calls
+        app.services.repository_analyzer.RepositoryAnalyzerService.MAX_CALLED_BY = original_called_by

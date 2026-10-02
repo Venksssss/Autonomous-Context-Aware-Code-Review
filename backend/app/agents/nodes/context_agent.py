@@ -97,10 +97,26 @@ def context_agent_node(state: ReviewWorkflowState) -> ReviewWorkflowState:
             if ctx:
                 symbols_context.append(ctx)
                 
+        # Collect unique related files from the context
+        related_files_set = set()
+        for ctx in symbols_context:
+            for call in ctx.calls:
+                if call.file: related_files_set.add(call.file)
+            for call in ctx.called_by:
+                if call.file: related_files_set.add(call.file)
+            for imp in ctx.imports:
+                if imp.file: related_files_set.add(imp.file)
+            for imp in ctx.imported_by:
+                if imp.file: related_files_set.add(imp.file)
+                
+        # Exclude already changed files from related files
+        related_files = sorted(list(related_files_set - set(changed_file_paths)))
+                
         context_output = {
             "changed_files": changed_file_paths,
             "changed_symbols": sorted_changed_symbols,
-            "symbols_context": [c.model_dump() for c in symbols_context]
+            "symbols_context": [c.model_dump() for c in symbols_context],
+            "related_files": related_files
         }
         
         logger.info(f"context_agent: completed with {len(sorted_changed_symbols)} changed symbols")

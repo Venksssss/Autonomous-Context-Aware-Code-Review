@@ -83,6 +83,11 @@ def test_context_agent_node_success(temp_repo):
     sym_ctx = [c for c in ctx["symbols_context"] if c["symbol"] == "AuthService.authenticate"]
     assert len(sym_ctx) == 1
     assert any("PaymentService.process" in call.get("symbol", "") for call in sym_ctx[0]["called_by"])
+    
+    # Check related_files correctly extracts payment.py
+    assert "related_files" in ctx
+    assert "payment.py" in ctx["related_files"]
+    assert "auth.py" not in ctx["related_files"]  # Excludes self
 
 def test_context_agent_node_missing_inputs():
     state = ReviewWorkflowState() # Empty state

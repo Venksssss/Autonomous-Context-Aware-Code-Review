@@ -16,3 +16,4 @@ class RepositoryContext(BaseModel):
     changed_files: List[str]
     changed_symbols: List[str]
     symbols_context: List[SymbolContext]
+    related_files: List[str] = []

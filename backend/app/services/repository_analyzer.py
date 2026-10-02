@@ -309,6 +309,12 @@ class RepositoryAnalyzerService:
             unresolved_references=unresolved_refs
         )
 
+    # Hard limits for context size control
+    MAX_CALLS = 20
+    MAX_CALLED_BY = 20
+    MAX_IMPORTS = 20
+    MAX_IMPORTED_BY = 20
+
     @staticmethod
     def get_symbol_context(repository_path: str, symbol: str) -> SymbolContext:
         """
@@ -338,34 +344,38 @@ class RepositoryAnalyzerService:
         for rel in graph.relationships:
             if rel.relationship_type == "calls":
                 if rel.source_symbol == symbol and rel.target_symbol and rel.resolution_status == "resolved":
-                    calls.append(ContextCall(
-                        symbol=rel.target_symbol,
-                        file=rel.target_file,
-                        line=rel.source_line
-                    ))
+                    if len(calls) < RepositoryAnalyzerService.MAX_CALLS:
+                        calls.append(ContextCall(
+                            symbol=rel.target_symbol,
+                            file=rel.target_file,
+                            line=rel.source_line
+                        ))
                 elif rel.target_symbol == symbol and rel.resolution_status == "resolved":
-                    called_by.append(ContextCall(
-                        symbol=rel.source_symbol or "",
-                        file=rel.source_file,
-                        line=rel.source_line
-                    ))
+                    if len(called_by) < RepositoryAnalyzerService.MAX_CALLED_BY:
+                        called_by.append(ContextCall(
+                            symbol=rel.source_symbol or "",
+                            file=rel.source_file,
+                            line=rel.source_line
+                        ))
             elif rel.relationship_type == "imports":
                 if rel.source_file == definition.file:
-                    mod = RepositoryAnalyzerService._file_to_module(Path(repository_path), Path(repository_path) / (rel.target_file or ""))
-                    imports.append(ContextImport(
-                        module=mod,
-                        name=rel.target_symbol,
-                        file=rel.source_file,
-                        line=rel.source_line
-                    ))
+                    if len(imports) < RepositoryAnalyzerService.MAX_IMPORTS:
+                        mod = RepositoryAnalyzerService._file_to_module(Path(repository_path), Path(repository_path) / (rel.target_file or ""))
+                        imports.append(ContextImport(
+                            module=mod,
+                            name=rel.target_symbol,
+                            file=rel.source_file,
+                            line=rel.source_line
+                        ))
                 if rel.target_symbol == symbol or (rel.target_file == definition.file and not rel.target_symbol):
-                    mod = RepositoryAnalyzerService._file_to_module(Path(repository_path), Path(repository_path) / (rel.target_file or ""))
-                    imported_by.append(ContextImport(
-                        module=mod,
-                        name=rel.target_symbol,
-                        file=rel.source_file,
-                        line=rel.source_line
-                    ))
+                    if len(imported_by) < RepositoryAnalyzerService.MAX_IMPORTED_BY:
+                        mod = RepositoryAnalyzerService._file_to_module(Path(repository_path), Path(repository_path) / (rel.target_file or ""))
+                        imported_by.append(ContextImport(
+                            module=mod,
+                            name=rel.target_symbol,
+                            file=rel.source_file,
+                            line=rel.source_line
+                        ))
                     
         return SymbolContext(
             symbol=symbol,
@@ -375,3 +385,4 @@ class RepositoryAnalyzerService:
             imports=imports,
             imported_by=imported_by
         )
+

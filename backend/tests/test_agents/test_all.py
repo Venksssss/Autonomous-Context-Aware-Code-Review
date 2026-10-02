@@ -185,7 +185,7 @@ class TestWorkflow:
             base_revision=git_repo["base"],
             head_revision=git_repo["head"],
         )
-        assert result.status == "planned"
+        assert result.status == "completed"
         assert result.review_plan is not None
         assert result.errors == []
 
@@ -295,5 +295,5 @@ class TestReviewAPI:
         })
         assert resp.status_code == 200
         data = resp.json()
-        assert data["status"] == "planned"
+        assert data["status"] == "completed"
         assert data["review_plan"] is not None

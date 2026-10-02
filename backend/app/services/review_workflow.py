@@ -88,19 +88,40 @@ class ReviewWorkflowService:
         # 4. Assemble result
         errors = final_state.get("errors") or []
         raw_plan = final_state.get("review_plan")
+        raw_findings = final_state.get("findings") or []
 
-        if raw_plan and not errors:
+        from app.schemas.agent_findings import Finding
+
+        plan = None
+        if raw_plan:
             try:
                 plan = ReviewPlan(**raw_plan)
-                return ReviewWorkflowResult(status="planned", review_plan=plan, errors=[])
             except Exception as exc:
-                return ReviewWorkflowResult(
-                    status="failed",
-                    errors=[f"ReviewPlan schema validation failed: {exc}"],
-                )
+                errors.append(f"ReviewPlan schema validation failed: {exc}")
+                
+        findings = []
+        for raw_f in raw_findings:
+            try:
+                if isinstance(raw_f, dict):
+                    findings.append(Finding(**raw_f))
+                else:
+                    findings.append(raw_f)
+            except Exception as exc:
+                errors.append(f"Finding schema validation failed: {exc}")
+
+        if errors:
+            status = "completed_with_errors" if plan else "failed"
+        else:
+            if plan and repository_path:
+                status = "completed"
+            elif plan:
+                status = "planned"
+            else:
+                status = "failed"
 
         return ReviewWorkflowResult(
-            status="failed" if errors else "planned",
-            review_plan=ReviewPlan(**raw_plan) if raw_plan else None,
+            status=status,
+            review_plan=plan,
+            findings=findings,
             errors=errors,
         )
