@@ -62,5 +62,64 @@ class FakeLLMProvider(LLMProvider):
                 ])
             else:
                 return schema(findings=[])
-            
+
+        # Handle synthesizer output schema
+        from app.services.review_agents.synthesizer import _SynthesizerLLMOutput
+        from app.schemas.agent_findings import Finding
+        if schema == _SynthesizerLLMOutput:
+            prompt_text = " ".join([m.content for m in messages if isinstance(m.content, str)])
+            # Extract findings passed in the prompt to return them consolidated
+            # The fake synthesizer just echoes findings and adds a summary
+            has_security = "SQL Injection" in prompt_text or "sec-001" in prompt_text
+            has_quality = "Inefficient Loop" in prompt_text or "qual-001" in prompt_text
+
+            consolidated: list = []
+            if has_security:
+                consolidated.append(Finding(
+                    id="sec-001",
+                    category="security",
+                    severity="high",
+                    title="SQL Injection Risk",
+                    description="Potential SQL injection in user query.",
+                    file_path="app/auth.py",
+                    start_line=47,
+                    end_line=47,
+                    evidence=["SELECT * FROM users WHERE id = "],
+                    recommendation="Use parameterized queries.",
+                    confidence=0.9,
+                    source_agent="security"
+                ))
+            if has_quality:
+                consolidated.append(Finding(
+                    id="qual-001",
+                    category="logic",
+                    severity="medium",
+                    title="Inefficient Loop",
+                    description="Unnecessary multiple database calls in loop.",
+                    file_path="app/auth.py",
+                    start_line=50,
+                    end_line=55,
+                    evidence=["user = db.get(user_id)"],
+                    recommendation="Fetch users in batch.",
+                    confidence=0.9,
+                    source_agent="quality"
+                ))
+
+            if consolidated:
+                count = len(consolidated)
+                summary = (
+                    f"Review identified {count} actionable issue(s): "
+                    + ", ".join(f.title for f in consolidated) + "."
+                )
+                recommendations = [f.recommendation for f in consolidated]
+            else:
+                summary = "No actionable issues were identified in the reviewed changes."
+                recommendations = []
+
+            return schema(
+                summary=summary,
+                findings=consolidated,
+                recommendations=recommendations,
+            )
+
         raise ValueError(f"FakeLLMProvider does not support schema {schema.__name__}")

@@ -1,16 +1,3 @@
-"""
-ReviewWorkflowService — application-facing interface to the LangGraph pipeline.
-
-Design rules:
-  - Routes call this service, NOT LangGraph directly.
-  - This service calls GitService directly (not via HTTP) to retrieve diffs.
-  - The LangGraph graph is built with an injected provider for testability.
-
-Why not call the /diff HTTP endpoint internally?
-  HTTP round-trips through our own server add latency and create tight
-  coupling.  Calling GitService.get_diff() directly is faster, simpler,
-  and avoids dependency on a running server during tests.
-"""
 from __future__ import annotations
 
 import logging
@@ -20,6 +7,7 @@ from app.agents.graph import build_review_graph
 from app.agents.state import ReviewWorkflowState
 from app.schemas.review_planner import ReviewPlan
 from app.schemas.review_workflow import ReviewWorkflowResult
+from app.schemas.final_review import FinalReviewReport
 from app.services.llm.interface import LLMProvider
 
 logger = logging.getLogger(__name__)
@@ -71,6 +59,7 @@ class ReviewWorkflowService:
             "review_plan": None,
             "context": None,
             "findings": [],
+            "final_review": None,
             "errors": [],
         }
 
@@ -89,6 +78,7 @@ class ReviewWorkflowService:
         errors = final_state.get("errors") or []
         raw_plan = final_state.get("review_plan")
         raw_findings = final_state.get("findings") or []
+        raw_final_review = final_state.get("final_review")
 
         from app.schemas.agent_findings import Finding
 
@@ -98,7 +88,7 @@ class ReviewWorkflowService:
                 plan = ReviewPlan(**raw_plan)
             except Exception as exc:
                 errors.append(f"ReviewPlan schema validation failed: {exc}")
-                
+
         findings = []
         for raw_f in raw_findings:
             try:
@@ -108,6 +98,16 @@ class ReviewWorkflowService:
                     findings.append(raw_f)
             except Exception as exc:
                 errors.append(f"Finding schema validation failed: {exc}")
+
+        final_review = None
+        if raw_final_review:
+            try:
+                if isinstance(raw_final_review, dict):
+                    final_review = FinalReviewReport(**raw_final_review)
+                elif isinstance(raw_final_review, FinalReviewReport):
+                    final_review = raw_final_review
+            except Exception as exc:
+                errors.append(f"FinalReviewReport schema validation failed: {exc}")
 
         if errors:
             status = "completed_with_errors" if plan else "failed"
@@ -123,5 +123,7 @@ class ReviewWorkflowService:
             status=status,
             review_plan=plan,
             findings=findings,
+            final_review=final_review,
             errors=errors,
         )
+

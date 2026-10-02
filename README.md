@@ -450,6 +450,131 @@ Before appending a finding to the state, the agents validate:
 **Final Synthesis**
 *Note: The final `synthesizer` node (which merges specialist findings into a cohesive final review report) is not yet implemented.*
 
+## Phase 3 — Segment 4: Synthesizer Agent + Final Review Report
+
+Segment 4 adds the Synthesizer Agent as the terminal node of the review graph. It consolidates all specialist findings into a single, developer-facing `FinalReviewReport`.
+
+### Architectural Principle
+
+Specialist agents **find** issues. The Synthesizer **organizes** issues.
+
+```
+Security Agent  →  finding
+Quality Agent   →  finding
+Context Agent   →  evidence
+                    ↓
+              Synthesizer
+                    ↓
+          FinalReviewReport
+```
+
+The Synthesizer does **not** perform fresh repository exploration. It reasons only over structured state already produced by the specialist agents.
+
+### Final Graph Topology
+
+```
+START → planner → context_agent
+                       │
+            ┌──────────┴──────────┐
+            ▼                     ▼
+      security_agent        quality_agent
+            │                     │
+            └──────────┬──────────┘
+                       ▼
+                  synthesizer
+                       ▼
+                      END
+```
+
+### FinalReviewReport Schema
+
+```json
+{
+  "summary": "Review identified 2 actionable issues: one high-severity SQL injection and one medium-severity logic defect.",
+  "overall_risk": "high",
+  "findings": [...],
+  "recommendations": [
+    "Use parameterized queries to prevent SQL injection.",
+    "Fetch users in batch to reduce database calls."
+  ],
+  "files_reviewed": ["app/auth.py", "app/payment.py"],
+  "analysis_metadata": {
+    "finding_count": 2,
+    "security_findings": 1,
+    "quality_findings": 1,
+    "agents_used": ["planner", "context", "security", "quality", "synthesizer"]
+  }
+}
+```
+
+### Deduplication
+
+The Synthesizer uses the LLM to identify overlapping findings (same file, same location, same root cause) and merge them into a single finding, preserving the higher severity and all evidence. Non-overlapping findings are always preserved.
+
+### Severity and Risk Policy
+
+- **Severity preservation**: The Synthesizer does not casually upgrade or downgrade individual finding severities.
+- **`overall_risk` is computed deterministically** by Python (not by the LLM) using the following policy:
+  - `critical` finding → overall `critical`
+  - else `high` → overall `high`
+  - else `medium` → overall `medium`
+  - else `low`/`info` → overall `low`
+  - no findings → overall `none`
+
+### Full API Response (POST /api/ai/review)
+
+```json
+{
+  "status": "completed",
+  "review_plan": {
+    "scope": ["security", "logic"],
+    "priority": "high",
+    "reason": "Authentication logic directly impacts access control.",
+    "required_context": ["AuthService.authenticate", "callers"]
+  },
+  "findings": [
+    {
+      "id": "sec-001",
+      "category": "security",
+      "severity": "high",
+      "title": "SQL Injection Risk",
+      "description": "...",
+      "file_path": "app/auth.py",
+      "start_line": 47,
+      "end_line": 47,
+      "evidence": ["SELECT * FROM users WHERE id = user_id"],
+      "recommendation": "Use parameterized queries.",
+      "source_agent": "security"
+    }
+  ],
+  "final_review": {
+    "summary": "Review identified 1 actionable issue: a high-severity SQL injection vulnerability.",
+    "overall_risk": "high",
+    "findings": [...],
+    "recommendations": ["Use parameterized queries to prevent SQL injection."],
+    "files_reviewed": ["app/auth.py"],
+    "analysis_metadata": {
+      "finding_count": 1,
+      "security_findings": 1,
+      "quality_findings": 0,
+      "agents_used": ["planner", "context", "security", "quality", "synthesizer"]
+    }
+  },
+  "errors": []
+}
+```
+
+Both raw `findings` (from specialists) and `final_review` (synthesized) are returned for transparency. Developers can compare the two to understand what the synthesizer changed in presentation versus what the specialists originally reported.
+
+### Error Handling
+
+- If a specialist agent fails, its findings are absent but errors are recorded. The Synthesizer still runs on whatever findings are available.
+- If the Synthesizer itself fails, `final_review` is `null` but all specialist `findings` and `errors` are preserved in the response.
+- The workflow status reflects partial failures:
+  - `completed` — all agents succeeded
+  - `completed_with_errors` — some agents failed but a plan was produced
+  - `failed` — no review plan could be produced
+
 ## Next Phases
-- Phase 3, Segment 4: Synthesizer agent, final review report, memory, and Docker sandbox.
 - Phase 4: GitHub PR automation and user-facing endpoints.
+

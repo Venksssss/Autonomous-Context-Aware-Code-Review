@@ -33,6 +33,10 @@ class ReviewWorkflowState(TypedDict, total=False):
     # Placeholder for future specialist agent findings
     findings: Annotated[List[Dict[str, Any]], operator.add]
 
+    # Final consolidated report produced by the Synthesizer Agent.
+    # None until the synthesizer node runs successfully.
+    final_review: Optional[Dict[str, Any]]
+
     # Errors accumulated across nodes; using add-reducer so multiple
     # nodes can each append without clobbering each other's entries.
     errors: Annotated[List[str], operator.add]

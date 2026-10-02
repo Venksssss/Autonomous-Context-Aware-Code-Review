@@ -2,6 +2,8 @@ from typing import List, Literal, Optional, Dict, Any
 from pydantic import BaseModel
 from app.schemas.review_planner import ReviewPlan
 from app.schemas.agent_findings import Finding
+from app.schemas.final_review import FinalReviewReport
+
 
 class ReviewWorkflowRequest(BaseModel):
     """
@@ -20,11 +22,14 @@ class ReviewWorkflowResult(BaseModel):
     Workflow execution result.
 
     Distinct from ReviewPlan:
-      ReviewPlan    = the planner's AI output (scope, priority, reason, …)
+      ReviewPlan          = the planner's AI output (scope, priority, reason, …)
       ReviewWorkflowResult = envelope describing the overall workflow run
+
+    Both raw specialist findings and the synthesized final_review are preserved
+    for transparency (developers can compare specialist vs. synthesized output).
     """
     status: Literal["planned", "completed", "completed_with_errors", "failed"]
     review_plan: Optional[ReviewPlan] = None
     findings: List[Finding] = []
+    final_review: Optional[FinalReviewReport] = None
     errors: List[str] = []
-
