@@ -16,11 +16,15 @@ class TestDiscoveryResult(BaseModel):
     test_count: int = 0
 
 class TestExecutionRequest(BaseModel):
+    __test__ = False
     repository_path: str
     test_path: Optional[str] = None
+    execution_mode: Literal["local", "docker"] = "local"
 
 class TestExecutionResult(BaseModel):
     framework: TestFramework
+    execution_mode: Literal["local", "docker"] = "local"
+    sandboxed: bool = False
     status: TestStatus
     exit_code: Optional[int]
     duration_seconds: float

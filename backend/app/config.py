@@ -16,5 +16,14 @@ class Settings(BaseSettings):
     llm_temperature: float = 0.0
     llm_timeout: float = 60.0
 
+    # Docker Sandbox Settings
+    docker_sandbox_enabled: bool = False
+    docker_image: str = "python:3.12-slim"
+    docker_cpu_limit: float = 1.0
+    docker_memory_limit: str = "512m"
+    docker_pids_limit: int = 128
+    docker_timeout_seconds: int = 60
+    docker_output_limit: int = 50000
+
 
 settings = Settings()

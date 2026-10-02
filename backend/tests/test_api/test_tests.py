@@ -3,6 +3,7 @@ import shutil
 import tempfile
 import pytest
 from fastapi.testclient import TestClient
+from unittest.mock import patch
 from app.main import app
 
 client = TestClient(app)
@@ -63,3 +64,59 @@ def test_api_run_path_traversal(temp_repo):
     })
     assert response.status_code == 400
     assert "TEST_TARGET_OUTSIDE_REPOSITORY" in response.text
+
+def test_api_run_tests_docker_disabled(temp_repo):
+    with patch("app.services.test_service.settings") as mock_settings:
+        mock_settings.docker_sandbox_enabled = False
+        response = client.post("/api/tests/run", json={
+            "repository_path": temp_repo,
+            "execution_mode": "docker"
+        })
+        assert response.status_code == 400
+        assert "DOCKER_SANDBOX_DISABLED" in response.text
+
+def test_api_run_tests_docker_unavailable(temp_repo):
+    with patch("app.services.test_service.settings") as mock_settings, \
+         patch("app.services.test_service.DockerRuntime.check_availability", return_value=False):
+        mock_settings.docker_sandbox_enabled = True
+        response = client.post("/api/tests/run", json={
+            "repository_path": temp_repo,
+            "execution_mode": "docker"
+        })
+        assert response.status_code == 400
+        assert "DOCKER_UNAVAILABLE" in response.text
+
+def test_api_run_tests_docker_success(temp_repo):
+    with patch("app.services.test_service.settings") as mock_settings, \
+         patch("app.services.test_service.DockerRuntime.check_availability", return_value=True), \
+         patch("app.services.test_service.DockerSandboxExecutor.execute_tests") as mock_exec:
+        
+        mock_settings.docker_sandbox_enabled = True
+        
+        from app.schemas.test_run import TestExecutionResult
+        mock_exec.return_value = TestExecutionResult(
+            framework="pytest",
+            status="passed",
+            exit_code=0,
+            duration_seconds=1.5,
+            stdout="success",
+            stderr="",
+            tests_run=1,
+            tests_passed=1,
+            tests_failed=0,
+            tests_skipped=0,
+            tests_errors=0,
+            execution_mode="docker",
+            sandboxed=True
+        )
+        
+        response = client.post("/api/tests/run", json={
+            "repository_path": temp_repo,
+            "execution_mode": "docker"
+        })
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["execution_mode"] == "docker"
+        assert data["sandboxed"] is True
+        assert data["status"] == "passed"

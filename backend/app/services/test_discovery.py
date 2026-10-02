@@ -5,6 +5,7 @@ from typing import List, Optional
 from app.schemas.test_run import TestDiscoveryResult, DiscoveredTest
 
 class TestDiscoveryError(Exception):
+    __test__ = False
     pass
 
 class TestDiscoveryService:

@@ -637,13 +637,14 @@ Discovers available tests in a target repository.
 ```
 
 #### POST `/api/tests/run`
-Executes tests in a target repository and parses the results deterministically.
+Executes tests in a target repository and parses the results deterministically. Supports `local` or `docker` execution mode.
 
 **Request:**
 ```json
 {
   "repository_path": "C:\\Projects\\repo",
-  "test_path": null
+  "test_path": null,
+  "execution_mode": "docker"
 }
 ```
 
@@ -651,6 +652,8 @@ Executes tests in a target repository and parses the results deterministically.
 ```json
 {
   "framework": "pytest",
+  "execution_mode": "docker",
+  "sandboxed": true,
   "status": "failed",
   "exit_code": 1,
   "duration_seconds": 1.82,
@@ -664,3 +667,38 @@ Executes tests in a target repository and parses the results deterministically.
   "output_truncated": false
 }
 ```
+
+## Phase 4 — Segment 2: Docker Sandboxed Execution
+
+Executing unreviewed code directly on the host is highly unsafe. Phase 4 Segment 2 introduces a defense-in-depth approach by wrapping test execution inside ephemeral Docker sandboxes.
+
+### Local vs. Docker Executor
+
+- **Local Executor (`execution_mode="local"`)**: Runs tests securely bounded to the repo directory, but within the host environment. Useful for controlled internal testing.
+- **Docker Sandbox (`execution_mode="docker"`)**: Runs the target repository's tests inside an isolated Docker container to protect the host machine from untrusted code.
+
+### Security Controls
+
+Docker sandboxing provides a strong layer of defense-in-depth against malicious repositories. The following restrictions are explicitly applied to every container test run:
+
+- **Network Isolation**: `--network none` entirely disables network connectivity, preventing unauthorized data exfiltration or external dependencies being silently downloaded.
+- **Read-Only Filesystem**: `--read-only` enforces a read-only root filesystem. The repository source itself is mounted read-only (`:ro`). Writable space is strictly confined to an ephemeral memory `tmpfs`.
+- **Capabilities Dropped**: `--cap-drop ALL` removes default container privileges.
+- **No New Privileges**: `--security-opt no-new-privileges=true` prevents internal privilege escalation.
+- **Resource Limits**: CPU (`--cpus`), memory (`--memory`), and process limits (`--pids-limit`) are enforced to avoid resource exhaustion and fork bombs.
+- **Timeout**: The host enforcing a strict timeout kills the container if execution exceeds limits.
+- **Ephemeral Cleanup**: `--rm` is used to automatically destroy containers and artifacts post-execution.
+
+*Note: Docker provides defense-in-depth, but should not be treated as an absolute security boundary against advanced hypervisor escapes. The Docker sandbox must be configured securely on a trusted system.*
+
+### Docker Setup Documentation
+
+To run the sandbox locally:
+1. **Install Docker**: Install Docker Desktop (Windows/Mac) or Docker Engine (Linux).
+2. **Verify Installation**: Ensure `docker info` and `docker version` succeed.
+3. **Configure Image**: Set the `DOCKER_IMAGE` environment variable (defaults to `python:3.12-slim`).
+4. **Pull the Image**: The API **will not** download images silently. You must pull the trusted image manually beforehand:
+   ```sh
+   docker pull python:3.12-slim
+   ```
+   *Note: Make sure your target image has pytest installed if running pytest natively.*

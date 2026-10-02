@@ -8,10 +8,10 @@ from typing import Optional, Tuple
 from app.schemas.test_run import TestExecutionRequest, TestExecutionResult, TestStatus
 
 class TestExecutionError(Exception):
-    pass
+    __test__ = False
 
 class TestTimeoutError(Exception):
-    pass
+    __test__ = False
 
 class PytestSummaryParser:
     @staticmethod
@@ -84,6 +84,7 @@ class PytestSummaryParser:
         return results
 
 class TestExecutorService:
+    __test__ = False
     def __init__(self, timeout_seconds: float = 60.0, max_output_chars: int = 50000):
         self.timeout_seconds = timeout_seconds
         self.max_output_chars = max_output_chars
